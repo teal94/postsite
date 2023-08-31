@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  db:
+    image: postgres
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+
+  django:
+    build:
+      context: .
+      dockerfile: ./compose/django/Dockerfile
+    volumes:
+      - ./postsite/:/app/
+    command: gunicorn postsite.wsgi:application --workers=4 --bind 0.0.0.0:13001
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+     - db
+     - redis
+    expose:
+     - "13001"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+  nginx:
+    image: nginx:latest
+    ports:
+     - "13000:13000"
+    volumes:
+     - ./postsite/:/app/
+     - ./postsite/collected_static:/static
+     - ./compose/nginx:/etc/nginx/conf.d
+    depends_on:
+     - django
+     - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
